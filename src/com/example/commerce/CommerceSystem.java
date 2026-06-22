@@ -7,10 +7,14 @@ import java.util.List;
 import java.util.Scanner;
 
 public class CommerceSystem {
-    private List<Category> categories;
+    private final List<Category> categories;
+    private final ShoppingCart cart;
+    private final InputView inputView =  new InputView();
+    private final OutputView outputView = new OutputView();
 
-    public CommerceSystem(List<Category> categories) {
+    public CommerceSystem(List<Category> categories, ShoppingCart cart) {
         this.categories = categories;
+        this.cart = cart;
     }
 
     public void setInitialValues() {
@@ -37,64 +41,69 @@ public class CommerceSystem {
     }
 
     public void start() {
-        Scanner sc = new Scanner(System.in);
         setInitialValues();
-
         while(true) {
             try {
-                System.out.println("[ 실시간 커머스 플랫폼 메인 ]");
-                for(int i = 0; i < categories.size(); i++) {
-                    System.out.println((i + 1) + ". " + categories.get(i).getName());
-                }
-                System.out.println("0. 종료");
+                outputView.printMainMenu(categories);
+                if(!cart.isEmpty()) outputView.printOrderManagement();
 
-                int categoryNum = sc.nextInt();
-
-                if(categoryNum == 0) {
-                    System.out.println("커머스 플랫폼을 종료합니다.");
+                int categoryNum = inputView.askCategoryNum(categories.size(), cart.isEmpty());
+                if(categoryNum == -1)
                     break;
-                } else if (categoryNum > categories.size()) {
-                    throw new IllegalArgumentException();
-                } else {
-                    Category selectedCategory = categories.get(categoryNum - 1);
-                    System.out.println("\n[ " + selectedCategory.getName() + "카테고리 ]");
-                    List<Product> products = selectedCategory.getProducts();
-                    printProducts(products, sc);
-                }
+                else
+                    selectCategory(categoryNum);
+
             } catch(InputMismatchException e) {
                 System.out.println("\n잘못된 입력입니다.\n");
-                sc.next();      //nextInt() 같은 메서드는 값이 자료형과 맞지 않으면 scanner의 포인터가 움직이지 않는다.
             } catch(IllegalArgumentException e) {
                 System.out.println("입력값이 범위를 벗어났습니다.\n");
             }
         }
     }
 
-    public void getProductDetail(List<Product> products, int productId) {
-        Product product = products.get(productId);
-        System.out.println("선택한 상품: " + product.getName() +
-                " | " + String.format("%,d", product.getPrice()) + " | " +
-                product.getDesc() + " | " +
-                "재고: " + product.getStock());
-        System.out.println();
+    public void selectCategory(int categoryNum) {
+        if(categoryNum == categories.size()) {
+            outputView.printShoppingCart(cart);
+            if(inputView.askToOrder(cart)) {
+                purchase();
+            } else
+                return;
+        } else if (categoryNum == categories.size() + 1) {
+            clearCart();
+        } else {
+            Category category = categories.get(categoryNum);
+            displayItems(category);
+        }
     }
 
-    public void printProducts(List<Product> products, Scanner sc) {
-        for(int i = 0; i < products.size(); i++) {
-            System.out.println(i+1 + " " + products.get(i).getName() + "\t| " +
-                    String.format("%,d", products.get(i).getPrice()) + "원\t| " +
-                    products.get(i).getDesc()
-            );
-        }
-        System.out.println("0. 뒤로가기");
-
-        int productNum = sc.nextInt();
-        if(productNum == 0) {
+    public void displayItems(Category category) {
+        outputView.printProductList(category.getName(), category.getProducts());
+        int productNum = inputView.askSelectedProductNum(category.getProducts());
+        if(productNum == 0)
             return;
-        } else if(productNum > products.size()) {
-            throw new IllegalArgumentException();
-        } else {
-            getProductDetail(products,  productNum);
-        }
+        Product selected = category.getProducts().get(productNum);
+
+        outputView.printProductDetail(selected);
+        boolean addToCart = inputView.askToAddCart();
+
+        if(addToCart) {
+            addToCart(selected);
+            outputView.printItemAddedToCart(selected.getName());
+        } else
+            return;
+    }
+
+    public void addToCart(Product product) {
+        cart.addItem(product, 1);
+    }
+
+    public void clearCart() {
+        cart.clearItems();
+        outputView.printOrderCancellation();
+    }
+
+    public void purchase() {
+        cart.getItems().forEach(outputView::printStockChange);
+        cart.purchase();
     }
 }

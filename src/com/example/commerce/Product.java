@@ -45,6 +45,13 @@ public class Product {
         this.stock = stock;
     }
 
+    public void decreaseStock(int quantity) {
+        if (stock < quantity) {
+            throw new IllegalArgumentException("재고가 부족합니다.");
+        }
+        stock -= quantity;
+    }
+
     /*
     상태만 반환할 건지
     재고 없는 상황같은 경우에서 예외를 던지는 로직 등을 포함할건지

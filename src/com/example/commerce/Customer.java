@@ -1,0 +1,15 @@
+package com.example.commerce;
+
+public class Customer {
+    private String name;
+    private String email;
+    private String rank;
+
+    public Customer(String name, String email, String rank) {
+        this.name = name;
+        this.email = email;
+        this.rank = rank;
+    }
+
+
+}

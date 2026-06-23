@@ -1,25 +1,23 @@
 package com.example.commerce;
 
-import javax.sound.sampled.Port;
-import java.util.ArrayList;
-import java.util.InputMismatchException;
-import java.util.List;
-import java.util.Scanner;
+import java.util.*;
 
 public class CommerceSystem {
     private final List<Category> categories;
     private final ShoppingCart cart;
     private final InputView inputView =  new InputView();
     private final OutputView outputView = new OutputView();
+    private final Admin admin;
 
-    public CommerceSystem(List<Category> categories, ShoppingCart cart) {
+    public CommerceSystem(List<Category> categories, ShoppingCart cart, Admin admin) {
         this.categories = categories;
         this.cart = cart;
+        this.admin = admin;
     }
 
     public void setInitialValues() {
         Category electronics = new Category("전자제품");
-        electronics.addProduct(new Product("Galaxy S25", 1200000, "최신 안드로이도 핸드폰", 10));
+        electronics.addProduct(new Product("Galaxy S25", 1200000, "최신 안드로이도 핸드폰", 0));
         electronics.addProduct(new Product("iPhone", 1350000, "Apple의 최신 스마트폰", 10));
         electronics.addProduct(new Product("MacBook Pro", 2400000, "M3 칩셋이 탑재된 노트북", 10));
         electronics.addProduct(new Product("AirPods Pro", 350000, "노이즈 캔슬링 무선 이어폰", 10));
@@ -64,12 +62,14 @@ public class CommerceSystem {
     public void selectCategory(int categoryNum) {
         if(categoryNum == categories.size()) {
             outputView.printShoppingCart(cart);
-            if(inputView.askToOrder(cart)) {
+            if(inputView.askToOrder()) {
                 purchase();
             } else
                 return;
         } else if (categoryNum == categories.size() + 1) {
             clearCart();
+        } else if (categoryNum == categories.size() + 2) {
+            adminMode();
         } else {
             Category category = categories.get(categoryNum);
             displayItems(category);
@@ -77,9 +77,9 @@ public class CommerceSystem {
     }
 
     public void displayItems(Category category) {
-        outputView.printProductList(category.getName(), category.getProducts());
+        outputView.printProductList(category.getName(), category.getProducts(), true);
         int productNum = inputView.askSelectedProductNum(category.getProducts());
-        if(productNum == 0)
+        if(productNum == -1)
             return;
         Product selected = category.getProducts().get(productNum);
 
@@ -107,7 +107,133 @@ public class CommerceSystem {
     }
 
     public void purchase() {
+        outputView.printTotalPrice(cart);
         cart.getItems().forEach(outputView::printStockChange);
         cart.purchase();
+    }
+
+    public void adminMode() {
+        outputView.printAdminValidation();
+        String password = inputView.askAdminPassword();
+
+        if(!admin.authenticate(password)) {
+            outputView.printPasswordIncorrect();
+            return;
+        }
+
+        while(true) {
+            outputView.printAdminMode();
+            int input = inputView.askAdminMode();
+
+            switch (input) {
+                case 1:
+                    addProduct();
+                    break;
+                case 2:
+                    editProduct();
+                    break;
+                case 3:
+                    deleteProduct();
+                    break;
+                case 4:
+                    outputView.printAllProducts(categories);
+                    break;
+                case 0:
+                    return;
+                default:
+                    throw new IllegalArgumentException();
+            }
+        }
+    }
+
+    public void addProduct() {
+        outputView.printCategoryProductAdd(categories);
+        int categoryNum = inputView.askAdminCategory(categories.size());
+
+        Category selected = categories.get(categoryNum);
+
+        outputView.printCategoryAddProductDetail(selected);
+        String productName = inputView.askAdminProductName();
+        outputView.printPriceInput();
+        int price = inputView.askAdminProductPrice();
+        outputView.printDescInput();
+        String desc =  inputView.askAdminProductDescription();
+        outputView.printStockInput();
+        int stock = inputView.askAdminProductStock();
+        Product newProduct = new Product(productName, price, desc, stock);
+
+        outputView.printAddProductDetail(newProduct);
+        if(inputView.askConfirmation()) {
+            selected.addProduct(newProduct);
+            outputView.printAddSuccess();
+        } else
+            return;
+    }
+
+    public void editProduct() {
+        outputView.printAskEditProduct();
+        String editName = inputView.askAdminEditProductName();
+        Optional<Product> found = categories.stream().flatMap(category ->
+                category.getProducts().stream())
+                .filter(product -> product.getName().equals(editName))
+                .findFirst();
+
+        if(found.isEmpty()) {
+            outputView.print("해당 상품은 존재하지 않습니다.");
+            return;
+        } else {
+            Product product = found.get();
+            outputView.printAskEditInfo();
+            int input = inputView.askAdminEditItem();
+
+            switch (input) {
+                case 1:
+                    int oldPrice = product.getPrice();
+                    outputView.printEditPrice(oldPrice);
+                    int newPrice = inputView.askAdminEditProductPrice();
+                    product.setPrice(newPrice);
+                    outputView.printEditSuccess(product.getName(), "가격", String.valueOf(oldPrice), String.valueOf(newPrice));
+                    break;
+                case 2:
+                    String oldDesc = product.getDesc();
+                    outputView.printEditDesc(oldDesc);
+                    String newDesc = inputView.askAdminProductDescription();
+                    product.setDesc(newDesc);
+                    outputView.printEditSuccess(product.getName(), "설명", String.valueOf(oldDesc), String.valueOf(newDesc));
+                    break;
+                case 3:
+                    int oldStock = product.getStock();
+                    outputView.printEditStock(oldStock);
+                    int newStock = inputView.askAdminProductStock();
+                    product.setStock(newStock);
+                    outputView.printEditSuccess(product.getName(), "재고수량", String.valueOf(oldStock), String.valueOf(newStock));
+                    break;
+                default:
+                    throw new IllegalArgumentException();
+            }
+        }
+
+    }
+
+    public void deleteProduct() {
+        outputView.printAskDeleteProduct();
+        String productName = inputView.askAdminProductName();
+
+        Optional<Product> found = categories.stream()
+                .flatMap(category -> category.getProducts()
+                        .stream().filter(product -> product.getName().equals(productName)))
+                .findFirst();
+
+        if(found.isEmpty()) {
+            outputView.print("상품을 찾을 수 없습니다.");
+        } else {
+            Product product = found.get();
+            outputView.printDeleteConfirmation(product);
+            if(inputView.askConfirmation()) {
+                categories.forEach(category -> category.deleteProduct(product));
+                outputView.printDeleteSuccess();
+            } else
+                return;
+        }
     }
 }

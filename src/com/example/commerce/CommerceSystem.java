@@ -88,13 +88,17 @@ public class CommerceSystem {
 
         if(addToCart) {
             addToCart(selected);
-            outputView.printItemAddedToCart(selected.getName());
         } else
             return;
     }
 
     public void addToCart(Product product) {
+        if(product.getStock() < 1) {
+            outputView.print("재고가 부족합니다.");
+            return;
+        }
         cart.addItem(product, 1);
+        outputView.printItemAddedToCart(product.getName());
     }
 
     public void clearCart() {

@@ -7,7 +7,14 @@ public class ShoppingCart {
     private final List<Item> items = new ArrayList<>();
 
     public void addItem(Product product, int quantity) {
-        items.add(new Item(product, quantity));
+        items.stream()
+                .filter(i -> i.getProduct().equals(product))
+                .findFirst()
+                .ifPresentOrElse(i -> {
+                    i.increaseQuantity(quantity);
+                },
+                    () -> items.add(new Item(product, quantity))
+                );
     }
 
     public List<Item> getItems() {

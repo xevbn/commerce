@@ -21,6 +21,10 @@ public class Item {
         return quantity;
     }
 
+    public void increaseQuantity(int quantity) {
+        this.quantity += quantity;
+    }
+
     public Product getProduct() {
         return this.product;
     }
